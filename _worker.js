@@ -14,12 +14,15 @@ let timestamp = 4102329600000;//2099-12-31
 let MainData = `
 vless://b7a392e2-4ef0-4496-90bc-1c37bb234904@cf.090227.xyz:443?encryption=none&security=tls&sni=edgetunnel-2z2.pages.dev&fp=random&type=ws&host=edgetunnel-2z2.pages.dev&path=%2F%3Fed%3D2048#%E5%8A%A0%E5%85%A5%E6%88%91%E7%9A%84%E9%A2%91%E9%81%93t.me%2FCMLiussss%E8%A7%A3%E9%94%81%E6%9B%B4%E5%A4%9A%E4%BC%98%E9%80%89%E8%8A%82%E7%82%B9
 https://sub.xf.free.hr/auto
+https://WARP.fxxk.dedyn.io/auto
 `
 
 let urls = [];
 let subconverter = "subapi-loadbalancing.pages.dev"; //在线订阅转换后端，目前使用CM的订阅转换功能。支持自建psub 可自行搭建https://github.com/bulianglin/psub
 let subconfig = "https://raw.githubusercontent.com/cmliu/ACL4SSR/main/Clash/config/ACL4SSR_Online_MultiCountry.ini"; //订阅配置文件
-let subProtocol = 'https';
+
+let subproxyUrl = "https://cfno1.pages.dev/sub";
+let encodedData = '';
 
 export default {
 	async fetch (request,env) {
@@ -32,16 +35,11 @@ export default {
 		ChatID = env.TGID || ChatID; 
 		TG =  env.TG || TG; 
 		subconverter = env.SUBAPI || subconverter;
-		if( subconverter.includes("http://") ){
-			subconverter = subconverter.split("//")[1];
-			subProtocol = 'http';
-		} else {
-			subconverter = subconverter.split("//")[1] || subconverter;
-		}
 		subconfig = env.SUBCONFIG || subconfig;
 		FileName = env.SUBNAME || FileName;
 		MainData = env.LINK || MainData;
 		if(env.LINKSUB) urls = await ADD(env.LINKSUB);
+		subproxyUrl = env.SUBPROXYURL || subproxyUrl;
 
 		const currentDate = new Date();
 		currentDate.setHours(0, 0, 0, 0); 
@@ -54,6 +52,9 @@ export default {
 		let expire= Math.floor(timestamp / 1000) ;
 		SUBUpdateTime = env.SUBUPTIME || SUBUpdateTime;
 
+		// 获取优选IP端口订阅数据
+		encodedData = await fetchSubscription(subproxyUrl);
+
 		let 重新汇总所有链接 = await ADD(MainData + '\n' + urls.join('\n'));
 		let 自建节点 ="";
 		let 订阅链接 ="";
@@ -61,7 +62,19 @@ export default {
 			if (x.toLowerCase().startsWith('http')) {
 				订阅链接 += x + '\n';
 			} else {
-				自建节点 += x + '\n';
+				//这里裂变所有可替换节点的优选IP和端口
+				const additionalName = "@bestvpschat"; // 你想要增加的名称
+				const newLinks = getEncodedNewLinks(x, additionalName);
+
+				if (newLinks.length > 0) {
+				   newLinks.forEach(newLink => {
+					自建节点 += newLink + '\n';
+				   });
+				} else {
+				   自建节点 += x + '\n';
+				}
+				
+				//自建节点 += x + '\n';
 			}
 		}
 		MainData = 自建节点;
@@ -90,8 +103,6 @@ export default {
 				订阅格式 = 'clash';
 			} else if (userAgent.includes('sing-box') || userAgent.includes('singbox') || ( (url.searchParams.has('sb') || url.searchParams.has('singbox')) && !userAgent.includes('subconverter'))){
 				订阅格式 = 'singbox';
-			} else if (userAgent.includes('surge') || ( url.searchParams.has('surge') && !userAgent.includes('subconverter'))){
-				订阅格式 = 'surge';
 			}
 
 			let subconverterUrl ;
@@ -111,8 +122,6 @@ export default {
 				追加UA = 'clash';
 			} else if(url.searchParams.has('singbox')){
 				追加UA = 'singbox';
-			} else if(url.searchParams.has('surge')){
-				追加UA = 'surge';
 			}
 			
 			try {
@@ -181,11 +190,9 @@ export default {
 					}
 				});
 			} else if (订阅格式 == 'clash'){
-				subconverterUrl = `${subProtocol}://${subconverter}/sub?target=clash&url=${encodeURIComponent(订阅转换URL)}&insert=false&config=${encodeURIComponent(subconfig)}&emoji=true&list=false&tfo=false&scv=true&fdn=false&sort=false&new_name=true`;
+				subconverterUrl = `https://${subconverter}/sub?target=clash&url=${encodeURIComponent(订阅转换URL)}&insert=false&config=${encodeURIComponent(subconfig)}&emoji=true&list=false&tfo=false&scv=true&fdn=false&sort=false&new_name=true`;
 			} else if (订阅格式 == 'singbox'){
-				subconverterUrl = `${subProtocol}://${subconverter}/sub?target=singbox&url=${encodeURIComponent(订阅转换URL)}&insert=false&config=${encodeURIComponent(subconfig)}&emoji=true&list=false&tfo=false&scv=true&fdn=false&sort=false&new_name=true`;
-			} else if (订阅格式 == 'surge'){
-				subconverterUrl = `${subProtocol}://${subconverter}/sub?target=surge&url=${encodeURIComponent(订阅转换URL)}&insert=false&config=${encodeURIComponent(subconfig)}&emoji=true&list=false&tfo=false&scv=true&fdn=false&sort=false&new_name=true`;
+				subconverterUrl = `https://${subconverter}/sub?target=singbox&url=${encodeURIComponent(订阅转换URL)}&insert=false&config=${encodeURIComponent(subconfig)}&emoji=true&list=false&tfo=false&scv=true&fdn=false&sort=false&new_name=true`;
 			}
 			console.log(订阅转换URL);
 			try {
@@ -309,6 +316,19 @@ async function MD5MD5(text) {
 	return secondHex.toLowerCase();
 }
 
+async function fetchSubscription(url) {
+    try {
+        const response = await fetch(url);
+        if (!response.ok) {
+            throw new Error('Network response was not ok');
+        }
+        const text = await response.text();
+        return text;
+    } catch (error) {
+        console.error('There has been a problem with your fetch operation:', error);
+    }
+}
+
 function clashFix(content) {
 	if(content.includes('wireguard') && !content.includes('remote-dns-resolve')){
 		let lines;
@@ -332,4 +352,103 @@ function clashFix(content) {
 		content = result;
 	}
 	return content;
+}
+
+// 判断字符串是否为Base64编码
+function isBase64(str) {
+    try {
+        return btoa(atob(str)) === str;
+    } catch (err) {
+        return false;
+    }
+}
+
+// Base64编码函数
+function base64Encode(str) {
+    try {
+        return btoa(str);
+    } catch (error) {
+        console.error('There has been a problem with your Base64 encoding operation:', error);
+    }
+}
+
+
+// 解析IP、端口和名称信息
+function parseIPPort(data) {
+    const lines = data.split('\n');
+    const ipPortList = lines.map(line => {
+        const match = line.match(/@([^:]+):(\d+)(#(.*))?/);
+        if (match) {
+            const lastHashIndex = line.lastIndexOf('#');
+            let name = lastHashIndex !== -1 ? line.substring(lastHashIndex + 1) : '';
+            return { ip: match[1], port: match[2], name };
+        }
+        return null;
+    }).filter(entry => entry !== null); // 过滤掉无效的条目
+    return ipPortList;
+}
+
+// 替换vmess链接中的IP和端口，并在原有ps标签基础上增加新的名称
+function replaceVmessIPPort(template, ip, port, newName) {
+    // 使用正则表达式获取ps标签的值
+    const psMatch = template.match(/"ps":\s*"(.*?)"/);
+    const originalName = psMatch ? psMatch[1] : '';
+    const finalName = originalName ? `${originalName}|${newName}` : newName;
+    
+    const replacedTemplate = template
+        .replace(/"add":\s*".*?"/, `"add": "${ip}"`)
+        .replace(/"port":\s*"\d+"/, `"port": "${port}"`)
+        .replace(/"ps":\s*".*?"/, `"ps": "${finalName}"`);
+
+    return replacedTemplate;
+}
+
+// 替换vless链接中的IP和端口，并在原有名称基础上增加新的名称
+function replaceVlessIPPort(template, ip, port, newName) {
+    const originalNameMatch = template.match(/#(.*)$/);
+    const originalName = originalNameMatch ? originalNameMatch[1] : '';
+    const finalName = originalName ? `${originalName}|${newName}` : newName;
+    return template.replace(/@[^:]+:\d+/, `@${ip}:${port}`).replace(/#.*$/, `#${finalName}`);
+}
+
+// 获取encodedNewLinks的方法
+function getEncodedNewLinks(templateLink, additionalName) {
+    const newLinks = [];
+
+    // 判断是vmess还是vless链接
+    const isVmess = templateLink.startsWith("vmess://");
+    const isVless = templateLink.startsWith("vless://");
+
+    // 去掉前缀
+    if (isVmess) {
+        templateLink = templateLink.slice(8);
+    } else if (isVless) {
+        templateLink = templateLink.slice(8);
+    }
+
+    // 判断templateLink是否为Base64编码并进行解码（仅针对vmess）
+    if (isVmess && isBase64(templateLink)) {
+        templateLink = base64Decode(templateLink);
+    }
+
+    if (encodedData) {
+        const decodedData = base64Decode(encodedData.trim());
+        if (decodedData) {
+            const ipPortList = parseIPPort(decodedData);
+            ipPortList.forEach(({ ip, port, name }) => {
+                const finalName = name ? `${name}|${additionalName}` : additionalName;
+                let newLink;
+                if (isVmess) {
+                    newLink = replaceVmessIPPort(templateLink, ip, port, finalName);
+                    const encodedNewLink = base64Encode(newLink);
+                    newLinks.push(`vmess://${encodedNewLink}`);
+                } else if (isVless) {
+                    newLink = replaceVlessIPPort(templateLink, ip, port, finalName);
+                    newLinks.push(`vless://${newLink}`);
+                }
+            });
+        }
+    }
+
+    return newLinks;
 }
