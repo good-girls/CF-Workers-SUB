@@ -63,7 +63,7 @@ export default {
 				订阅链接 += x + '\n';
 			} else {
 				//这里裂变所有可替换节点的优选IP和端口
-				const additionalName = "@bestvpschat"; // 你想要增加的名称
+				const additionalName = "@Jerome"; // 你想要增加的名称
 				const newLinks = getEncodedNewLinks(x, additionalName);
 
 				if (newLinks.length > 0) {
